@@ -15,19 +15,22 @@ supabase = create_client(url, key)
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel("gemini-3.5-flash")
 
-st.title("Supabase + Gemini Demov2")
+st.title("Supabase + Gemini Demov3")
 
-if st.button("Load Data"):
+# if st.button("Load Data"):
 
-    result = (
-        supabase
-        .table("employees1")
-        .select("*")
-        .execute()
-    )
+#     result = (
+#         supabase
+#         .table("employees1")
+#         .select("*")
+#         .execute()
+#     )
 
-    st.write("Employee Data")
-    st.write(result.data)
+#     st.write("Employee Data")
+#     st.write(result.data)
+result = supabase.table("employees").select("*").execute()
+
+question = st.text_input("Ask about employees") 
 
 if st.button("Ask"):
     prompt = f"""
