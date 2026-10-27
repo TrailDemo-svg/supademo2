@@ -28,7 +28,7 @@ st.title("Supabase + Gemini Demov3")
 
 #     st.write("Employee Data")
 #     st.write(result.data)
-result = supabase.table("employees").select("*").execute()
+result = supabase.table("employees1").select("*").execute()
 
 question = st.text_input("Ask about employees") 
 
