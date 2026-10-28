@@ -22,4 +22,4 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run App
-        run: python app.py
+        run: python test2.py
