@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+    branches: [master, v0.*]
+  pull_request:
+    branches: master
+  schedule:
+    - cron:  '0 6 * * 1,4' # Each Monday and Thursday at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NB_KERNEL: python
+  MPLBACKEND: Agg
+  SEABORN_DATA: ${{ github.workspace }}/seaborn-data
+  PYDEVD_DISABLE_FILE_VALIDATION: 1
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Install seaborn
+        run: uv sync --python 3.13 --no-default-groups --extra stats --group docs
+
+      - name: Install pandoc
+        run: |
+          wget https://github.com/jgm/pandoc/releases/download/3.1.11/pandoc-3.1.11-1-amd64.deb
+          sudo dpkg -i pandoc-3.1.11-1-amd64.deb
+
+      - name: Cache datasets
+        run: |
+          git clone https://github.com/mwaskom/seaborn-data.git
+          ls $SEABORN_DATA
+
+      - name: Build docs
+        run: make docs
+
+
+  run-tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
+        install: [full]
+        deps: [latest]
+
+        include:
+          - python: "3.10"
+            install: full
+            deps: pinned
+          - python: "3.13"
+            install: light
+            deps: latest
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Install seaborn
+        run: |
+          # full installs the optional stats dependencies; light omits them.
+          # latest resolves the newest compatible releases (default), while
+          # pinned resolves the minimum versions declared in pyproject.toml.
+          EXTRA=""; if [[ ${{ matrix.install }} == 'full' ]]; then EXTRA='--extra stats'; fi
+          RES="";   if [[ ${{ matrix.deps }} == 'pinned' ]]; then RES='--resolution lowest-direct'; fi
+          uv sync --python ${{ matrix.python }} --no-default-groups --group test $EXTRA $RES
+
+      - name: Run tests
+        run: make test
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d # v3.1.4
+        if: ${{ success() }}
+
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Install tools
+        # ruff needs no project dependencies, so install it in isolation.
+        run: uv sync --only-group lint
+
+      - name: Lint
+        run: make lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Install tools
+        run: uv sync --python 3.13 --no-default-groups --extra stats --group typecheck
+
+      - name: Type checking
+        run: make typecheck
